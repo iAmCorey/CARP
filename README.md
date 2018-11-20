@@ -23,3 +23,9 @@ The objective of CARP is to determine a set of routes for the vehicle to serve a
 - the tasks set T
 - v0
 - capacity Q
+
+
+# Steps
+Step1: calculate the shortest distance between the depot to every other node. -> 2D-matrix `distances`
+Step2: use Path-Scanning method to get a feasible solution
+Step3(if have enough time): use the feasible solution as the initial population and use the genetic algorithm to iteration to get a better solution
