@@ -6,7 +6,7 @@
 #    By: Corey <390583019@qq.com>                   +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2018/11/06 11:17:19 by Corey             #+#    #+#              #
-#    Updated: 2018/11/20 15:15:39 by Corey            ###   ########.fr        #
+#    Updated: 2018/11/22 20:59:55 by Corey            ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -16,6 +16,7 @@ import time
 import sys
 import getopt
 import heapq
+import copy
 import numpy as np
 
 
@@ -41,7 +42,7 @@ def main():
     capacity = 0
     total_cost = 0
 
-
+    start = time.time()
     try:
         f = open(INS_FILE_PATH)
         ins_name = f.readline().split(':')[1].strip() # the name of instance
@@ -75,19 +76,29 @@ def main():
         # for debug
         # print(this_graph.getDemandMatrix())
         # print(this_graph.getDistanceMatrix())
-        # print(this_graph.getDistanceMatrix()[75,77])
 
         task_list = np.where(this_graph.getDemandMatrix() > 0)
         free = list(zip(task_list[0],task_list[1])) # free 
         # print(free)
 
-        routes = pathScanning(this_graph,free,capacity,depot)
+        routes = pathScanning(this_graph, free, capacity, depot, 2)
         cost = getCost(this_graph, routes, depot)
+
+        # print(cost)
+        # costs = []
+        # for i in range(4):
+        #     # print(routes)
+        #     rule = i+2 
+        #     costs.append(pathScanning(this_graph, free, capacity, depot, rule))
+
+        # print(costs) 
+
+        (routes,cost) = flip(this_graph,routes,cost,depot)
 
         print("s", (",".join(str(d) for d in s_format(routes))).replace(" ", ""))
         print("q", cost)
+        print("cost time:", time.time()-start)
         
-
     except IOError:
         print("File not found! Please check your instance file path.")
         pass
@@ -97,7 +108,7 @@ def main():
 
 
 
-def pathScanning(graph,free,capacity,start):
+def pathScanning(graph,free,capacity,start,rule):
     k = 0
     route = [[]]
     cost = [0]
@@ -117,7 +128,7 @@ def pathScanning(graph,free,capacity,start):
                     choice.append(task)
             
             if len(choice):
-                choosing_task = ChooseTask(graph, depot, choice, remain_cap, capacity, 2)
+                choosing_task = ChooseTask(graph, depot, choice, remain_cap, capacity, rule)
                 route[k].append(choosing_task)
                 # print(choosing_task)
                 free.remove(choosing_task)
@@ -129,21 +140,27 @@ def pathScanning(graph,free,capacity,start):
         
 
 
-    return route[1:]
+    return copy.deepcopy(route[1:])
 
 
 def ChooseTask(graph, depot, choice, remain_cap, capacity, rule_num):
     distances = {}
+    terms = {}
     for each_choice in choice:
-            distance = graph.getDistanceMatrix()[depot, each_choice[0]]
-            distances[distance] = each_choice
+        distance = graph.getDistanceMatrix()[depot, each_choice[0]]
+        distances[distance] = each_choice
+        term = (graph.getDemandMatrix()[each_choice[0],each_choice[1]]) / (graph.getCostMatrix()[each_choice[0],each_choice[1]])
+        terms[term] = each_choice
             
     if rule_num == 1:
         choosing = distances[max(distances)]
-
-    if rule_num == 2:
+    elif rule_num == 2:
         choosing = distances[min(distances)]
-    if rule_num == 5:
+    elif rule_num == 3:
+        choosing = terms[max(terms)]
+    elif rule_num == 4:
+        choosing = terms[min(terms)]
+    elif rule_num == 5:
         
         if remain_cap > 0.5 * capacity:
             # maximize the distance between the task and the depot
@@ -166,6 +183,34 @@ def getCost(graph, routes, depot):
             cost += graph.getDistanceMatrix()[node[1],next_node[0]] + graph.getCostMatrix()[next_node[0],next_node[1]]
 
     return cost
+
+def flip(graph, routes, cost, depot):
+
+    for i in range(len(routes)):
+        for j in range(len(routes[i])):
+            new_routes = copy.deepcopy(routes)
+            flip_item = new_routes[i][j]
+            new_flip_item = (flip_item[1],flip_item[0])
+            flip_item = new_flip_item
+            new_routes[i][j] = flip_item
+
+            if getCost(graph, routes, depot) < cost:
+                print(new_flip_item)
+                routes = new_routes
+                cost = getCost(graph, routes, depot)
+
+    return (routes,cost)
+
+
+def validPath(graph, routes):
+    for route in routes:
+        capacity = 0
+        for node in route:
+            capacity += graph.getDemandMatrix(node[0],node[1]) 
+        if capacity > graph.capacity:
+            return False
+    return True
+
 
 def s_format(s):
     s_print = []
@@ -198,13 +243,13 @@ class graph():
         self.tasks_list = []
         self.non_tasks = int(Non_tasks)  # the number of non-required edges
         self.vehicles = int(Vehicles) #  the number of vehicles
-        self.capacity = int(Capacity)  # the capicity of each vehicle
+        self.capacity = int(Capacity)  # the capacity of each vehicle
         self.total_cost = int(Total_cost)  # the total cost of all tasks
         
         self.__edges = []
         self.__vertex = []
 
-        # adjacent matrix
+        # demand matrix
         self.__matrix = np.zeros([self.vertices+1,self.vertices+1]) 
         self.__matrix[self.__matrix == 0] = -1
         # -1 is no edge, others are edges with their demand
@@ -214,12 +259,12 @@ class graph():
         self.__costs[self.__costs == 0] = -1
         # -1 is no edge, others are the cost of their edge. 
 
-        # the matrix for the shortest distance between every 2 nodes.
+        # distance matrix
         self.__distances = np.zeros([self.vertices+1, self.vertices+1])
         self.__distances[self.__distances == 0] = float("inf")
         for i in range(self.vertices+1):
             self.__distances[i,i] = 0
-        # inf for no edge between these 2 nodes. 
+        # The shortest distance between every 2 nodes, inf for no edge between these 2 nodes.
 
         self.free = [] # free list
         pass
@@ -234,10 +279,11 @@ class graph():
         self.__costs[edge.start,edge.end] = self.__costs[edge.end,edge.start] = edge.cost
         pass
 
+    def getEdges(self):
+        return copy.deepcopy(self.__edges)
 
     def setDistanceMatrix(self):
         for i in range(self.vertices): # i+1 is start node
-            # print(i+1,": ")
             self.dijkstra(self.getDemandMatrix,i+1)
         pass
 
@@ -246,11 +292,25 @@ class graph():
         pass
 
     def getDistanceMatrix(self):
-        return self.__distances.copy()
+        return copy.deepcopy(self.__distances)
 
     def getCostMatrix(self):
-        return self.__costs.copy()
+        return copy.deepcopy(self.__costs)
 
+    def getNeighbor(self,node):
+        result = np.where(self.__matrix[node]!=-1)
+        result = list(result[0])
+        return result
+
+
+    def addVertex(self,vertex):
+        self.__vertex.append(vertex)
+
+    def getVertex(self):
+        return copy.deepcopy(self.__vertex)
+    
+    def getDemandMatrix(self):
+        return copy.deepcopy(self.__matrix)
 
     def dijkstra(self,graph,start):
         heap = [] # the elements are (node,distance)
@@ -277,25 +337,5 @@ class graph():
                             parent[neighbor] = curr[1]
                             heapq.heappush(heap,(self.getDistanceMatrix()[start, neighbor],neighbor))
         # print(parent)
-
-
-    def getNeighbor(self,node):
-        result = np.where(self.__matrix[node]!=-1)
-        result = list(result[0])
-        #result = list(zip(result[0],result[1]))
-        return result
-
-
-    def addVertex(self,vertex):
-        self.__vertex.append(vertex)
-
-    def getEdges(self):
-        return self.__edges.copy()
-
-    def getVertex(self):
-        return self.__vertex.copy()
-    
-    def getDemandMatrix(self):
-        return self.__matrix.copy()
 
 main()

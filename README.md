@@ -29,3 +29,17 @@ The objective of CARP is to determine a set of routes for the vehicle to serve a
 Step1: calculate the shortest distance between the depot to every other node. -> 2D-matrix `distances`
 Step2: use Path-Scanning method to get a feasible solution
 Step3(if have enough time): use the feasible solution as the initial population and use the genetic algorithm to iteration to get a better solution
+
+# Usage
+Use the command `python CARP_solver.py < CARP instance file > -t <termination> -s <random seed>` in terminal. 
+output: 
+Print two lines. Each of them, according to its first char, must belong to one of the categories described below. Lines that do not start with one of the patterns below will be considered a comment and hence ignored.
+Solution line begins with a lower case “s” followed by a space (ASCII code 32). Only one such line is allowed and it is mandatory.
+Quality line begins with a lower case “q” followed by a space (ASCII code 32). Only one such line is allowed and it is mandatory.
+
+e.g.
+```
+s 0,(1,2),(2,4),(4,1),0,0,(4,3),(3,1),0
+q 40
+```
+
